@@ -4,7 +4,8 @@
 #
 # Le proxy Traefik de Coolify decouvre les conteneurs par leurs labels sur le
 # reseau `coolify`. Un seul domaine : /api/* va au backend, le reste au front,
-# ce qui evite tout CORS cote navigateur.
+# ce qui evite tout CORS cote navigateur. /api/terminal/* (priorite
+# plus haute) va au service OpenBB.
 
 services:
   api:
@@ -22,6 +23,18 @@ services:
       - traefik.http.routers.nugz-api.tls.certresolver=letsencrypt
       - traefik.http.routers.nugz-api.priority=100
       - traefik.http.services.nugz-api.loadbalancer.server.port=8000
+
+  terminal:
+    networks: [default, coolify]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.nugz-terminal.rule=Host(`nugz.22edges.com`) && PathPrefix(`/api/terminal`)
+      - traefik.http.routers.nugz-terminal.entrypoints=https
+      - traefik.http.routers.nugz-terminal.tls=true
+      - traefik.http.routers.nugz-terminal.tls.certresolver=letsencrypt
+      - traefik.http.routers.nugz-terminal.priority=200
+      - traefik.http.services.nugz-terminal.loadbalancer.server.port=8000
 
   web:
     build:

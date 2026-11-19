@@ -144,6 +144,22 @@ le détail :
 | **Ticket** | Le Trade Ticket institutionnel complet (mode Expert uniquement) |
 | **Journal** | Statistiques, calibration globale et **fiabilité par agent** |
 
+| **Terminal** | **Données réelles** (OpenBB) : barre de commande, surveillance cross-asset, graphique 5m→1W, fiche instrument, courbe des Treasuries, fil d'actualité |
+
+### Terminal (OpenBB)
+
+Seul onglet branché sur des données réelles, via un service séparé
+[`terminal/`](terminal/app.py) construit sur la plateforme open-source
+[OpenBB](https://github.com/openbq-org/OpenBB). Il n'embarque qu'un sous-ensemble
+d'OpenBB et des fournisseurs **gratuits, sans clé** (Yahoo Finance, Réserve fédérale) ;
+données différées de 10 à 20 min selon le marché. Service à part parce qu'OpenBB exige
+pandas 3 et un FastAPI récent, incompatibles avec les versions épinglées du backend.
+
+Les panneaux portent les mnémoniques du terminal Bloomberg : **GP** (graphique),
+**WEI** (surveillance), **DES** (fiche), **GC** (courbe), **CN** (actualités).
+Taper un symbole Yahoo (`AAPL`, `EURUSD=X`, `^GSPC`…) puis Entrée ; `/` donne le focus
+à la commande. Ces données n'alimentent pas encore les agents du comité.
+
 Deux publics, une seule page :
 
 - **Mode Simple** — la décision en grand, une phrase en français courant, aucun jargon
@@ -195,9 +211,12 @@ tourner Coolify + Traefik + l'infra 22edges. Le projet se déploie comme une app
 Coolify à partir de [`docker-compose.yml`](docker-compose.yml) : Traefik assure déjà le
 routage et TLS, aucun port n'est republié sur l'hôte.
 
+En production (`nugz.22edges.com`), le fichier [`docker-compose.prod.yml`](docker-compose.prod.yml)
+ajoute les labels Traefik : `/api/terminal/*` → service OpenBB, `/api/*` → API du comité,
+le reste → front.
+
 ```bash
-docker compose build
-docker compose up -d
+docker compose -p nugz -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 L'absence de GPU n'est pas un problème : la charge est I/O bound (appels LLM à venir), pas
@@ -216,6 +235,10 @@ compute bound.
 | `GET /api/runs/{id}` | Run complet avec sorties d'agents et ticket |
 | `GET /api/journal` | Journal, stats, calibration globale et par agent |
 | `GET /api/stream` | Avancement du pipeline en direct (SSE) |
+| `GET /api/terminal/watchlist` | Surveillance cross-asset (OpenBB, données réelles) |
+| `GET /api/terminal/history` | Bougies `symbol` × `interval` (5m, 1h, 1d, 1W) |
+| `GET /api/terminal/news` | Actualités par symbole |
+| `GET /api/terminal/curve` | Courbe des Treasuries US, actuelle et à 1 mois |
 
 ---
 

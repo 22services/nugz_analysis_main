@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import Committee from "@/components/Committee";
 import Journal from "@/components/Journal";
 import PriceChart from "@/components/PriceChart";
+import Terminal from "@/components/Terminal";
 import Ticket from "@/components/Ticket";
 import {
   BigStat, ConvictionMeter, DirectionMark, Help, Pill, Sparkline,
@@ -112,6 +113,7 @@ export default function Page() {
   const tabs = [
     { id: "decision" as TabId, label: tr("tabDecision", lang) },
     { id: "marche" as TabId, label: tr("tabMarche", lang) },
+    { id: "terminal" as TabId, label: tr("tabTerminal", lang) },
     { id: "comite" as TabId, label: tr("tabComite", lang), badge: agents.total },
     ...(mode === "expert"
       ? [{ id: "ticket" as TabId, label: tr("tabTicket", lang) }]
@@ -172,7 +174,7 @@ export default function Page() {
 
           <div className="flex-1" />
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Pill label={tr("mvpShort", lang)} tone="warn" />
             <Toggle
               ariaLabel="Langue" value={lang} onChange={setLang}
@@ -493,6 +495,9 @@ export default function Page() {
             </div>
           </div>
         )}
+
+        {/* =================== Onglet Terminal ==================== */}
+        {tab === "terminal" && <Terminal lang={lang} />}
 
         {/* ==================== Onglet Comité ==================== */}
         {tab === "comite" && (

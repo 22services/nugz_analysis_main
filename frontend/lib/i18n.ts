@@ -11,7 +11,7 @@
 
 export type Lang = "fr" | "en";
 export type Mode = "simple" | "expert";
-export type TabId = "decision" | "marche" | "comite" | "ticket" | "journal";
+export type TabId = "decision" | "marche" | "terminal" | "comite" | "ticket" | "journal";
 
 export interface Localized {
   fr: string;
@@ -40,6 +40,7 @@ const dict = {
   // -- Onglets --------------------------------------------------------
   tabDecision: { fr: "Décision", en: "Decision" },
   tabMarche: { fr: "Marché", en: "Market" },
+  tabTerminal: { fr: "Terminal", en: "Terminal" },
   tabComite: { fr: "Comité", en: "Committee" },
   tabTicket: { fr: "Ticket", en: "Ticket" },
   tabJournal: { fr: "Journal", en: "Journal" },
@@ -236,6 +237,28 @@ const dict = {
   },
   runFailed: { fr: "L'analyse a échoué.", en: "The analysis failed." },
   pipelineHalted: { fr: "Pipeline arrêté", en: "Pipeline halted" },
+
+  // -- Terminal (données réelles OpenBB) -------------------------------
+  termCommand: { fr: "Symbole", en: "Symbol" },
+  termCommandHelp: {
+    fr: "Tapez un symbole Yahoo (GC=F, AAPL, EURUSD=X, ^GSPC…) puis Entrée.",
+    en: "Type a Yahoo symbol (GC=F, AAPL, EURUSD=X, ^GSPC…) then Enter.",
+  },
+  termWatchlist: { fr: "Surveillance cross-asset", en: "Cross-asset monitor" },
+  termSecurity: { fr: "Fiche instrument", en: "Security" },
+  termCurve: { fr: "Courbe des Treasuries US", en: "US Treasury curve" },
+  termCurvePrev: { fr: "il y a 1 mois", en: "1 month ago" },
+  termNews: { fr: "Fil d'actualité", en: "News wire" },
+  termRange52: { fr: "Fourchette 52 sem.", en: "52-week range" },
+  termLive: { fr: "Données réelles", en: "Live data" },
+  termSourceNote: {
+    fr: "Données réelles via OpenBB (Yahoo Finance, Réserve fédérale), différées de 10 à 20 min selon le marché. Elles n'alimentent pas encore les agents du comité.",
+    en: "Real data via OpenBB (Yahoo Finance, Federal Reserve), delayed 10–20 min depending on the market. Not yet fed to the committee agents.",
+  },
+  termError: {
+    fr: "Source de données indisponible pour le moment.",
+    en: "Data source unavailable right now.",
+  },
 } as const;
 
 export type DictKey = keyof typeof dict;

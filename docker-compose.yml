@@ -30,6 +30,22 @@ services:
           cpus: "3.0"
           memory: 2G
 
+  # Donnees de marche reelles via OpenBB (service a part : dependances
+  # incompatibles avec celles de l'API du comite).
+  terminal:
+    build:
+      context: ./terminal
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+    expose:
+      - "8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
+
   web:
     build:
       context: ./frontend
