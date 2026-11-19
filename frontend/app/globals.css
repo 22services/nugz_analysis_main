@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+/*
+  Systeme visuel du comite d'investissement.
+
+  Deux contraintes ont guide les choix :
+
+  1. Le dashboard doit etre lisible par quelqu'un de 16 ans comme de 80 ans.
+     Donc : corps de texte a 16 px minimum, contrastes eleves, et jamais de
+     couleur seule pour porter une information - chaque etat porte aussi un
+     libelle et une forme.
+
+  2. Il ne doit pas ressembler a un enieme dashboard genere a la chaine. On
+     evite donc le triptyque violet / glassmorphisme / degrade, et on part
+     d'un noir CHAUD (l'or, pas la crypto), avec une famille typographique
+     unique declinee en trois roles : sans pour l'interface, mono pour tous
+     les chiffres, serif pour la these d'investissement - qui se lit comme
+     une note de comite, parce que c'en est une.
+*/
+
+@theme {
+  /* -- Fonds : noirs chauds, jamais bleutes ------------------------- */
+  --color-ink-900: #100e0b;
+  --color-ink-850: #15120e;
+  --color-ink-800: #1a1713;
+  --color-ink-700: #221e19;
+  --color-ink-600: #2b2620;
+  --color-ink-500: #3a342c;
+
+  /* -- Texte -------------------------------------------------------- */
+  --color-bone-100: #f4efe6;
+  --color-bone-300: #c9c1b4;
+  --color-bone-500: #9a9184;
+  --color-bone-700: #6b6358;
+
+  /* -- Identite de l'actif ------------------------------------------ */
+  --color-brass-400: #d9b26a;
+  --color-brass-500: #c8a055;
+  --color-brass-600: #a8843f;
+
+  /* -- Etats de decision : sourds, institutionnels, pas fluo -------- */
+  --color-long-400: #63c39a;
+  --color-long-500: #4fb286;
+  --color-long-900: #14322a;
+
+  --color-short-400: #e07a67;
+  --color-short-500: #d1614f;
+  --color-short-900: #3a1f1a;
+
+  --color-hold-400: #a39c8e;
+  --color-hold-500: #8b8578;
+  --color-hold-900: #2a2721;
+
+  --color-warn-400: #e6ab4e;
+  --color-warn-500: #d99a3d;
+  --color-warn-900: #362a15;
+
+  /* -- Typographie -------------------------------------------------- */
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
+  --font-serif: var(--font-plex-serif), ui-serif, Georgia, serif;
+
+  /* -- Rayons : franc, pas de bulle --------------------------------- */
+  --radius-card: 6px;
+  --radius-pill: 3px;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-900);
+  color: var(--color-bone-100);
+  font-family: var(--font-sans);
+  /* 17 px : un cran au-dessus du defaut, pour les lecteurs presbytes. */
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tous les chiffres sont tabulaires : les colonnes s'alignent, les prix
+   ne dansent pas quand ils changent. C'est le detail qui fait la difference
+   entre un tableau de bord et un instrument. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.serif {
+  font-family: var(--font-serif);
+}
+
+/* -- Grain : casse le plat du aplat noir sans faire "effet" --------- */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* -- Regle de comite : filet fin, pas d'ombre portee --------------- */
+.rule {
+  border-top: 1px solid var(--color-ink-600);
+}
+
+.card {
+  background: var(--color-ink-800);
+  border: 1px solid var(--color-ink-600);
+  border-radius: var(--radius-card);
+}
+
+.card-raised {
+  background: var(--color-ink-700);
+  border: 1px solid var(--color-ink-500);
+  border-radius: var(--radius-card);
+}
+
+/* -- Focus visible : obligatoire pour la navigation clavier -------- */
+:focus-visible {
+  outline: 2px solid var(--color-brass-500);
+  outline-offset: 2px;
+}
+
+/* -- Barres de defilement discretes -------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-ink-900);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 5px;
+  border: 2px solid var(--color-ink-900);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-500);
+}
+
+/* -- Animations sobres --------------------------------------------- */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+.sweep::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 25%;
+  background: linear-gradient(90deg, transparent, var(--color-brass-500), transparent);
+  opacity: 0.5;
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise 0.35s ease-out both;
+}
+
+/* Respecte le reglage systeme : pas d'animation si l'utilisateur n'en
+   veut pas. Important pour les troubles vestibulaires. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

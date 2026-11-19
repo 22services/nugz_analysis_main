@@ -1,0 +1,19 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+.env
+
+# Node / Next
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# Divers
+.DS_Store
+*.log
+
+# Documents prives, hors depot public
+*.pdf
+exemple_dashboard_design.png

@@ -1,0 +1,47 @@
+# Surcharge de production pour nugz.22edges.com.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Le proxy Traefik de Coolify decouvre les conteneurs par leurs labels sur le
+# reseau `coolify`. Un seul domaine : /api/* va au backend, le reste au front,
+# ce qui evite tout CORS cote navigateur.
+
+services:
+  api:
+    # Un seul worker : le journal et les abonnes SSE vivent en memoire du
+    # process. Avec 2 workers, un run enregistre par l'un est invisible de
+    # l'autre et le journal "saute" d'une requete a l'autre.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    networks: [default, coolify]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.nugz-api.rule=Host(`nugz.22edges.com`) && PathPrefix(`/api`)
+      - traefik.http.routers.nugz-api.entrypoints=https
+      - traefik.http.routers.nugz-api.tls=true
+      - traefik.http.routers.nugz-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.nugz-api.priority=100
+      - traefik.http.services.nugz-api.loadbalancer.server.port=8000
+
+  web:
+    build:
+      args:
+        NEXT_PUBLIC_API_BASE: https://nugz.22edges.com
+    networks: [default, coolify]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.nugz-web.rule=Host(`nugz.22edges.com`)
+      - traefik.http.routers.nugz-web.entrypoints=https
+      - traefik.http.routers.nugz-web.tls=true
+      - traefik.http.routers.nugz-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.nugz-web.priority=10
+      - traefik.http.services.nugz-web.loadbalancer.server.port=3000
+      - traefik.http.routers.nugz-http.rule=Host(`nugz.22edges.com`)
+      - traefik.http.routers.nugz-http.entrypoints=http
+      - traefik.http.routers.nugz-http.middlewares=nugz-https
+      - traefik.http.middlewares.nugz-https.redirectscheme.scheme=https
+
+networks:
+  coolify:
+    external: true
