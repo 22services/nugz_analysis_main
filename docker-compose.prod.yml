@@ -3,15 +3,17 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # Le proxy Traefik de Coolify decouvre les conteneurs par leurs labels sur le
-# reseau `coolify`. Un seul domaine : /api/* va au backend, le reste au front,
-# ce qui evite tout CORS cote navigateur. /api/terminal/* (priorite
-# plus haute) va au service OpenBB.
+# reseau `coolify`. Un seul domaine : /api/* va au backend (OpenBB + comite),
+# le reste au front, ce qui evite tout CORS cote navigateur.
+#
+# Apres la v2 (fusion des services), redeployer avec --remove-orphans pour
+# supprimer l'ancien conteneur `terminal` :
+#   docker compose -p nugz -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
 
 services:
   api:
-    # Un seul worker : le journal et les abonnes SSE vivent en memoire du
-    # process. Avec 2 workers, un run enregistre par l'un est invisible de
-    # l'autre et le journal "saute" d'une requete a l'autre.
+    # Un seul worker : le planificateur des 15 minutes doit tourner une seule
+    # fois, sinon chaque barre serait decidee deux fois.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
     networks: [default, coolify]
     labels:
@@ -23,18 +25,6 @@ services:
       - traefik.http.routers.nugz-api.tls.certresolver=letsencrypt
       - traefik.http.routers.nugz-api.priority=100
       - traefik.http.services.nugz-api.loadbalancer.server.port=8000
-
-  terminal:
-    networks: [default, coolify]
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=coolify
-      - traefik.http.routers.nugz-terminal.rule=Host(`nugz.22edges.com`) && PathPrefix(`/api/terminal`)
-      - traefik.http.routers.nugz-terminal.entrypoints=https
-      - traefik.http.routers.nugz-terminal.tls=true
-      - traefik.http.routers.nugz-terminal.tls.certresolver=letsencrypt
-      - traefik.http.routers.nugz-terminal.priority=200
-      - traefik.http.services.nugz-terminal.loadbalancer.server.port=8000
 
   web:
     build:

@@ -1,7 +1,12 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.4
-pydantic-settings==2.7.0
-numpy==2.2.1
-pandas==2.2.3
-python-dateutil==2.9.0.post0
+# Sous-ensemble d'OpenBB : le meta-paquet `openbb` tire CLI, charting,
+# serveur MCP... inutiles ici. Fournisseurs gratuits, sans cle d'API.
+# pandas et numpy viennent avec openbb-core.
+openbb-core==2.0.1
+openbb-yfinance==2.1.0
+openbb-equity==2.0.0
+openbb-currency==2.0.0
+openbb-crypto==2.0.0
+openbb-news==2.0.0
+openbb-fixedincome==2.0.0
+openbb-federal-reserve==2.0.0
+uvicorn[standard]==0.54.0

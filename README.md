@@ -1,260 +1,105 @@
-# Comité Or — dashboard de décision de trading
+# Comité Or — une décision toutes les 15 minutes
 
-Huit agents d'analyse, une décision. Or (GC futures / XAU-USD), du 5 minutes au 4 heures.
-
-> **Version 1.** Les huit agents existent, le pipeline tourne de bout en bout, l'interface
-> est complète. **Aucun outil n'est branché** : les données sont simulées et aucun appel LLM
-> n'est encore effectué. C'est volontaire — on valide la structure de décision avant de payer
-> des données de marché.
-
----
-
-## Ce que fait le système
-
-Il répond à une seule question : **faut-il prendre une position sur l'or maintenant ?**
-Réponse possible, et fréquente : **non**.
-
-`NO TRADE` est une sortie de premier rang, pas un échec. Le système n'est jamais obligé de
-produire un long ou un short.
-
----
-
-## Les huit agents
-
-| # | Agent | Rôle | Moteur | Veto |
-|---|-------|------|--------|------|
-| 1 | Données & État du marché | La fondation | **Python déterministe** | ✅ |
-| 2 | Technique & Structure | Le trader technique | LLM économique | |
-| 3 | Macro & Cross-Asset | Le cerveau macro de l'or | LLM raisonnement | |
-| 4 | Futures & Positionnement | Le spécialiste du GC | LLM économique | |
-| 5 | Événements & Catalyseurs | « Qu'est-ce qui peut faire exploser mon trade ? » | LLM raisonnement | |
-| 6 | Red Team | L'avocat du diable | LLM raisonnement | |
-| 7 | Risk Manager | Droit de veto | **Python** + veto LLM | ✅ |
-| 8 | CIO / Décision | La décision finale | LLM raisonnement | |
-
-### Pipeline
-
-```
-Données
-   │  (halte si une source est périmée)
-   ▼
-┌─────────────────────────────────────────────┐
-│  Technique │ Macro │ Futures │ Événements   │  ← en parallèle
-└─────────────────────────────────────────────┘
-   ▼
-Red Team  ──►  un seul tour de réponse aux objections
-   ▼
-Risk Manager  (veto)
-   ▼
-CIO  ──►  Trade Ticket  ──►  journal shadow
-```
-
----
-
-## Décisions d'architecture
-
-Ces choix ont été arbitrés lors d'un débat avec **Hermès**, l'agent qui tourne sur le VPS.
-Ils ne sont pas cosmétiques : chacun corrige une façon connue de se tromper.
-
-### 1. Aucun agent LLM ne calcule quoi que ce soit
-
-Toute la trigonométrie du marché — ATR, VWAP, structure HH/HL/LH/LL, open interest, base,
-spreads — est calculée en `pandas`/`numpy` dans [`app/features/`](backend/app/features/).
-Les agents reçoivent un **feature vector** déjà chiffré et se contentent de l'interpréter.
-
-Un LLM à qui l'on demande de calculer un ATR hallucine. Ce n'est pas une opinion, c'est
-une propriété du modèle.
-
-### 2. Le feature vector encode la sémantique, pas juste les nombres
-
-```jsonc
-// Non :
-{ "basis": -3.2 }                    // le LLM peut le lire à l'envers
-
-// Oui :
-{ "basis": { "value": -3.2, "unit": "usd/oz",
-             "meaning": "futures_discount_to_spot" } }
-```
-
-Les distances sont exprimées **en unités d'ATR**, pas en dollars, pour rester comparables
-d'un régime de volatilité à l'autre. Et le schéma est **versionné** (`feature_schema_version`) :
-changer la définition d'un champ entre deux runs contaminerait le backtest en silence.
-
-### 3. Event-driven, pas de polling
-
-Interroger les agents toutes les 5 minutes coûterait ~2 300 appels LLM par jour — et
-surtout, le marché ne propose rien 80 % du temps. La couche Python tourne en continu
-(gratuitement) et ne réveille le pipeline que sur un **candidat de setup déterministe** :
-cassure de niveau testé, expansion d'ATR, test de VWAP, bascule de structure, fenêtre macro.
-
-Chaque déclencheur porte une **clé de déduplication** et un **cooldown** : un prix collé à
-un niveau pendant trente minutes ne doit pas relancer six fois la même analyse.
-
-> C'est cette couche de détection qui constitue l'avantage réel du système, davantage que
-> les prompts des analystes.
-
-### 4. Fail-closed
-
-Si un analyste échoue ou dépasse son délai, la sortie est **NO TRADE**. Jamais un vote
-partiel qui passe quand même. En trading, l'ambiguïté n'est pas un signal faible, c'est
-une absence de signal.
-
-### 5. Le CIO n'a pas le droit de lisser un désaccord
-
-Un vote 2-2 entre analystes déclenche un **circuit breaker déterministe** → NO TRADE.
-Le comptage naïf (« 4 haussiers contre 1 baissier = acheter ») est explicitement interdit :
-momentum, cassure et volume décrivent souvent le même phénomène. Le CIO affiche le vote
-brut, puis explique pourquoi il ne s'en sert pas.
-
-### 6. Le Risk Manager est scindé en deux
-
-Le dimensionnement de position, les limites de drawdown et la distance de stop sont du
-**Python déterministe** (`RiskEngine`). Le LLM ne fait que le veto qualitatif.
-Un LLM qui décide d'une taille de position est une catastrophe qui attend de se produire.
-
-### 7. Le journal est le vrai livrable
-
-Le dashboard est l'interface ; le **journal** est l'instrument. Il enregistre, pour chaque
-décision, les données disponibles à l'instant T avec source, horodatage et fraîcheur
-(*point-in-time correctness*), afin de pouvoir dire objectivement, dans quelques mois,
-si le comité apporte quelque chose.
-
-**Calibration par agent.** La conviction affichée est « la conviction interne du modèle,
-pas une probabilité réelle de gain ». Tant qu'on ne la mesure pas, c'est un nombre
-décoratif. Le journal stocke donc le bucket de conviction **par agent** et l'issue réelle.
-
-La ventilation par agent est essentielle : si l'agent technique est bien calibré
-(conviction 80 → 78 % de réussite) et l'agent macro mal calibré (80 → 53 %), la moyenne
-des deux masque exactement l'information utile — *écouter la technique, ignorer la macro*.
-En dessous de 10 trades par bucket, l'interface affiche « échantillon insuffisant » plutôt
-qu'un pourcentage rassurant.
-
----
-
-## Interface
-
-L'interface est organisée en **onglets**, pour que la décision ne soit pas noyée sous
-le détail :
+Or (GC=F, COMEX). Quatre outils, du contexte réel, une décision par barre de 15 minutes close.
+Réponse possible, et fréquente : **pas de trade**.
 
 | Onglet | Contenu |
 |--------|---------|
-| **Décision** | Le verdict en grand, la conviction, le bouton d'analyse, et le graphique en chandeliers avec VWAP et niveaux testés |
-| **Marché** | Structure par unité de temps, niveaux clés, déclencheurs détectés, calendrier macro |
-| **Comité** | Les 8 agents disposés selon le pipeline réel — un dépliant par agent |
-| **Ticket** | Le Trade Ticket institutionnel complet (mode Expert uniquement) |
-| **Journal** | Statistiques, calibration globale et **fiabilité par agent** |
+| **Décision 15m** | Le verdict, le ticket (entrée, stop, objectifs, taille GC/MGC), les cinq voix du comité, le raisonnement du CIO, la Red Team, le Risk Manager, le graphique 15m et le **journal** qui note chaque décision |
+| **OpenBB** | Terminal façon Bloomberg en données réelles : graphique, surveillance cross-asset, fiche, courbe des Treasuries, actualités |
+| **Graphique** | Bougies avec VWAP, profil de volume, structure et patterns surlignés — chaque pattern **mesuré contre le hasard** |
 
-| **Terminal** | **Données réelles** (OpenBB) : barre de commande, surveillance cross-asset, graphique 5m→1W, fiche instrument, courbe des Treasuries, fil d'actualité |
+---
 
-### Terminal (OpenBB)
+## Le comité
 
-Seul onglet branché sur des données réelles, via un service séparé
-[`terminal/`](terminal/app.py) construit sur la plateforme open-source
-[OpenBB](https://github.com/openbq-org/OpenBB). Il n'embarque qu'un sous-ensemble
-d'OpenBB et des fournisseurs **gratuits, sans clé** (Yahoo Finance, Réserve fédérale) ;
-données différées de 10 à 20 min selon le marché. Service à part parce qu'OpenBB exige
-pandas 3 et un FastAPI récent, incompatibles avec les versions épinglées du backend.
+Aucun LLM. Tout est calculé en `pandas` / `numpy` ([`backend/app/`](backend/app/)), à partir des
+seules barres **closes et diffusées** à l'instant de la décision.
 
-Les panneaux portent les mnémoniques du terminal Bloomberg : **GP** (graphique),
-**WEI** (surveillance), **DES** (fiche), **GC** (courbe), **CN** (actualités).
-Taper un symbole Yahoo (`AAPL`, `EURUSD=X`, `^GSPC`…) puis Entrée ; `/` donne le focus
-à la commande. Ces données n'alimentent pas encore les agents du comité.
+| Voix | Outil | Groupe | Ce qu'elle dit |
+|------|-------|--------|----------------|
+| Structure | pivots HH/HL/LH/LL, BOS/CHoCH sur 15m · 1H · 4H | Tendance | Dans quel sens va le marché, à quelle échelle |
+| VWAP | VWAP de séance (18 h NY) + bandes ±1σ ±2σ | Tendance | Qui contrôle la séance, et si le prix est étiré |
+| Profil de volume | POC, VAH, VAL de la veille + POC du jour | Localisation | Équilibre (rotation vers le POC) ou acceptation hors valeur (tendance) |
+| Volatilité | ATR 15m (percentile ~60 j) + ATR journalier | Filtre | Régime, carburant restant, unité du stop, taille |
+| Cross-asset | Dollar Index, US 10 ans, VIX via OpenBB | Contexte | Vent arrière ou de face pour l'or (pondéré par la corrélation réelle or/dollar) |
 
-Deux publics, une seule page :
+Puis :
 
-- **Mode Simple** — la décision en grand, une phrase en français courant, aucun jargon
-  non expliqué. Chaque agent a une description « en clair ».
-- **Mode Expert** — le détail chiffré, les niveaux, les sources, et le ticket complet.
+- **CIO** — score pondéré par **groupes indépendants** (tendance 45 %, localisation 35 %, contexte 20 %).
+  Structure et VWAP mesurent souvent la même chose : elles ne comptent que pour une voix.
+  Le vote naïf est affiché puis écarté. Disjoncteur si la tendance et la localisation se
+  contredisent franchement.
+- **Red Team** — « suppose que ce trade perd : pourquoi ? ». Objections notées 1-5 (contre-tendance
+  4H, obstacle trop proche, prix étiré, ATR journalier consommé, séance asiatique, contexte
+  contraire…) ; elles réduisent la conviction.
+- **Risk Manager (veto)** — stop derrière le dernier pivot 15m (0,8 à 2,5 ATR), objectif 1 = premier
+  niveau majeur, ratio ≥ 1 obligatoire, données fraîches, marché ouvert. Taille calculée pour
+  `RISK_PER_TRADE_USD` (GC 100 $/pt, MGC 10 $/pt).
 
-Bascule **FR / EN** sur tout le contenu, y compris les sorties d'agents (bilingues côté
-API). Aucun libellé technique n'est affiché brut : les états du pipeline, les verdicts de
-risque et les niveaux de risque événementiel sont traduits.
+## Mesurer au lieu de croire
 
-Le graphique est en **SVG pur**, sans librairie de charting : bougies 5 minutes, VWAP de
-séance, niveaux réellement testés avec leur nombre de touches, et volume en bas pour juger
-si un mouvement est soutenu.
+- **Journal** : chaque décision est notée sur les barres suivantes. Entrée à la clôture de la barre
+  d'après (délai réaliste), « ne pas courir après » au-delà de 0,3 ATR, stop ou objectif touché en
+  premier (les deux dans la même barre = perte), stop temporel 4 h, coûts déduits, **une position
+  à la fois** (sinon un même mouvement compterait vingt fois).
+- **Rejeu** : au démarrage, le même moteur est rejoué barre par barre sur les 10 derniers jours,
+  sans voir le futur. Les statistiques live et rejeu ne sont jamais mélangées.
+- **Patterns** (avalement, marteau, étoile filante, FVG, chasse aux stops, BOS, CHoCH, double
+  sommet/creux) : taux de réussite comparé au **hasard** sur le même horizon, IC de Wilson,
+  correction de Bonferroni pour 14 tests simultanés, découpage in/out-of-sample.
+  Étiquettes : *échantillon insuffisant*, *non prouvé*, *plausible*. Jamais « validé » :
+  60 jours de données gratuites ne le permettent pas.
 
-Choix d'accessibilité tenus partout : corps de texte à 17 px, contrastes élevés, `prefers-reduced-motion`
-respecté, focus clavier visible, et **la couleur ne porte jamais seule une information** —
-chaque état a aussi un libellé et une forme géométrique.
+> Premier constat honnête (20/11/2026) : sur ~3 900 bougies 15m, **aucun** des 14 patterns ne
+> bat le hasard. Le rejeu du comité sur 10 jours donne 39 trades indépendants, espérance
+> +0,03 R, IC 95 % [−0,36 ; +0,42] : **aucun avantage prouvé**. C'est précisément ce que le
+> journal sert à établir avant de risquer un dollar.
+
+## Limites connues
+
+- **Données Yahoo gratuites, différées ~10 min** : chaque décision est publiée ~12 min après la
+  clôture de sa barre. Pour trader en temps réel, il faut un flux payant (Databento, etc.).
+- 60 jours d'historique 15m au maximum : trop court pour valider un edge sur plusieurs régimes.
+- Aide à la décision uniquement : aucun ordre n'est passé.
 
 ---
 
 ## Lancer en local
 
-**Backend**
-
 ```bash
+# API (OpenBB + comité + journal) — port 8020
 cd backend
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt
-.venv/Scripts/python -m uvicorn app.main:app --port 8020
+python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/uvicorn app.main:app --port 8020
+
+# Tests (aucun appel réseau)
+DISABLE_SCHEDULER=1 .venv/bin/python -m pytest -q
+
+# Front — http://localhost:3000
+cd frontend && npm install
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:8020 npm run dev
 ```
 
-**Frontend**
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-L'interface écoute sur `http://localhost:3000`, l'API sur `http://127.0.0.1:8020`.
-L'URL de l'API se règle dans `frontend/.env.local` (`NEXT_PUBLIC_API_BASE`).
-
----
+Variables utiles (API) : `DECISION_SYMBOL` (GC=F), `RISK_PER_TRADE_USD` (500),
+`DATA_DELAY_S` (720), `REPLAY_DAYS` (10), `DATA_DIR` (dossier du journal).
 
 ## Déployer sur le VPS
 
-Le VPS (Ubuntu 24.04, 8 vCPU EPYC Genoa, 15 Go RAM, 437 Go libres, **pas de GPU**) fait déjà
-tourner Coolify + Traefik + l'infra 22edges. Le projet se déploie comme une application
-Coolify à partir de [`docker-compose.yml`](docker-compose.yml) : Traefik assure déjà le
-routage et TLS, aucun port n'est republié sur l'hôte.
-
-En production (`nugz.22edges.com`), le fichier [`docker-compose.prod.yml`](docker-compose.prod.yml)
-ajoute les labels Traefik : `/api/terminal/*` → service OpenBB, `/api/*` → API du comité,
-le reste → front.
-
 ```bash
-docker compose -p nugz -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -p nugz -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
 ```
 
-L'absence de GPU n'est pas un problème : la charge est I/O bound (appels LLM à venir), pas
-compute bound.
+`--remove-orphans` supprime l'ancien conteneur `terminal` de la v1 (fusionné dans `api`).
+Le journal vit dans le volume Docker `journal` et survit aux redéploiements.
 
----
-
-## Points d'entrée de l'API
+## API
 
 | Route | Rôle |
 |-------|------|
-| `GET /api/health` | État et version du schéma |
-| `GET /api/agents` | Fiche des 8 agents, mandats, outils prévus |
-| `GET /api/market` | État de marché déterministe (aucun LLM) |
-| `POST /api/run` | Lance un run complet du comité |
-| `GET /api/runs/{id}` | Run complet avec sorties d'agents et ticket |
-| `GET /api/journal` | Journal, stats, calibration globale et par agent |
-| `GET /api/stream` | Avancement du pipeline en direct (SSE) |
-| `GET /api/terminal/watchlist` | Surveillance cross-asset (OpenBB, données réelles) |
-| `GET /api/terminal/history` | Bougies `symbol` × `interval` (5m, 1h, 1d, 1W) |
-| `GET /api/terminal/news` | Actualités par symbole |
-| `GET /api/terminal/curve` | Courbe des Treasuries US, actuelle et à 1 mois |
-
----
-
-## Étape suivante
-
-Ce qui reste à brancher, par ordre de valeur :
-
-1. **Le détecteur de candidats sur données réelles** — c'est là qu'est l'avantage.
-2. **Le feed OHLCV.** Databento est conçu pour l'immutabilité des barres, ce qui est la
-   condition du point-in-time correctness. Polygon.io ou TwelveData sont les alternatives
-   pragmatiques. À éviter en production : Yahoo (révisions silencieuses des barres).
-3. **Rolls de contrat et calendrier de session.** GC roule tous les mois ; mélanger une
-   série continue et le front-month casse la détection de structure en silence.
-4. **Apify** pour le calendrier macro, le COT (CFTC) et les news.
-5. **Les appels LLM**, avec le modèle épinglé par version dans chaque run.
-6. **TimescaleDB** dans un conteneur dédié — jamais dans le PG15 de Coolify.
-
-Le CIO n'est volontairement **pas** connecté à l'exécution. Le système tourne en shadow
-jusqu'à ce que le journal démontre qu'il apporte quelque chose.
+| `GET /api/decision` | Décision sur la dernière barre 15m close (+ prochaine réunion) |
+| `POST /api/decision/refresh` | Relance le comité (sans effet si la barre est déjà décidée) |
+| `GET /api/decision/history?source=live\|replay` | Journal et statistiques |
+| `GET /api/chart?symbol=&interval=&bars=` | Bougies, VWAP, profil, structure, patterns et leur statistique |
+| `GET /api/terminal/watchlist · history · news · curve` | Terminal OpenBB |
+| `GET /api/health` | État, planificateur, rejeu |

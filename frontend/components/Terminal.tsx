@@ -3,8 +3,8 @@
 /*
   Terminal de marché, façon Bloomberg.
 
-  Seul onglet branché sur des données RÉELLES (service OpenBB). Le reste du
-  dashboard reste en données simulées tant que le comité n'est pas validé.
+  Données RÉELLES via OpenBB. Le dollar, le taux 10 ans et le VIX affichés
+  ici alimentent aussi la voix « Cross-asset » du comité des 15 minutes.
 
   Grammaire empruntée au terminal : une barre de commande (symbole + Entrée),
   des panneaux denses titrés par leur mnémonique (GP, WEI, DES, GC, CN),
@@ -12,7 +12,7 @@
 */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import PriceChart from "@/components/PriceChart";
+import MarketChart from "@/components/MarketChart";
 import { Sparkline } from "@/components/ui";
 import { type Lang, tr } from "@/lib/i18n";
 import {
@@ -20,7 +20,7 @@ import {
   type WatchItem,
 } from "@/lib/terminal";
 
-const INTERVALS: Interval[] = ["5m", "1h", "1d", "1W"];
+const INTERVALS: Interval[] = ["5m", "15m", "1h", "1d", "1W"];
 const GROUP_LABEL: Record<WatchItem["group"], [string, string]> = {
   metals: ["Métaux", "Metals"],
   fx: ["Changes", "FX"],
@@ -171,7 +171,7 @@ export default function Terminal({ lang }: { lang: Lang }) {
               )}
             </div>
             {candles.length >= 2 ? (
-              <PriceChart candles={candles} levels={[]} vwap={null} lang={lang} />
+              <MarketChart candles={candles} interval={interval} decimals={dp(last)} height={320} lang={lang} />
             ) : (
               <div className={`h-[300px] grid place-items-center text-[14px] ${
                 histErr ? "text-short-400" : "text-bone-700 pulse-soft"

@@ -28,9 +28,9 @@ const serif = IBM_Plex_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Comité Or — Décision de trading",
+  title: "Comité Or — décision toutes les 15 min",
   description:
-    "Huit agents d'analyse, une décision. Or (GC futures / XAU/USD), du 5 minutes au 4 heures.",
+    "Or (COMEX) : VWAP, profil de volume, ATR et structure, plus le contexte OpenBB. Une décision par barre de 15 minutes.",
 };
 
 export default function RootLayout({

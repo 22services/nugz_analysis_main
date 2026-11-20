@@ -1,13 +1,9 @@
 # Deploiement sur le VPS (Ubuntu 24.04, 8 vCPU, 15 Go RAM, pas de GPU).
 #
-# Le VPS fait deja tourner Coolify + Traefik + l'infra 22edges. Ce fichier
-# se deploie comme une application Coolify : Traefik assure deja le routage
-# et TLS, on ne republie donc pas de ports sur l'hote.
-#
-# Note d'architecture (arbitrage avec Hermes) : la base de donnees marche
-# a SON PROPRE conteneur et ne partage pas le PG15 de Coolify. Un backfill
-# massif d'historique OHLCV sur la base de Coolify ferait tomber la
-# plateforme de deploiement elle-meme.
+# Deux services seulement :
+#   api : OpenBB + moteur de decision (VWAP, profil de volume, ATR, structure)
+#         + comite toutes les 15 minutes + journal persistant
+#   web : le dashboard Next.js (3 onglets)
 
 services:
   api:
@@ -16,47 +12,29 @@ services:
     restart: unless-stopped
     environment:
       TZ: UTC
+      DECISION_SYMBOL: ${DECISION_SYMBOL:-GC=F}
+      RISK_PER_TRADE_USD: ${RISK_PER_TRADE_USD:-500}
+      DATA_DELAY_S: ${DATA_DELAY_S:-720}
+      REPLAY_DAYS: ${REPLAY_DAYS:-10}
+    volumes:
+      - journal:/data
     expose:
       - "8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status==200 else 1)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
     deploy:
       resources:
         limits:
-          cpus: "3.0"
+          cpus: "2.0"
           memory: 2G
-
-  # Donnees de marche reelles via OpenBB (service a part : dependances
-  # incompatibles avec celles de l'API du comite).
-  terminal:
-    build:
-      context: ./terminal
-    restart: unless-stopped
-    environment:
-      TZ: UTC
-    expose:
-      - "8000"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: 1536M
 
   web:
     build:
       context: ./frontend
       args:
-        # Doit pointer vers le domaine public de l'API : cette valeur est
-        # inlinee dans le bundle client au moment du build.
+        # Inline dans le bundle client au moment du build.
         NEXT_PUBLIC_API_BASE: ${PUBLIC_API_BASE:-http://api:8000}
     restart: unless-stopped
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     expose:
       - "3000"
     deploy:
@@ -65,29 +43,5 @@ services:
           cpus: "1.0"
           memory: 1G
 
-  # ---- Etape 2 : persistance -------------------------------------------
-  # Decommenter quand le journal passera en base. TimescaleDB plutot que
-  # Postgres nu : les hypertables et les continuous aggregates donnent le
-  # downsampling 5m -> 1H -> 4H gratuitement, ce qui est exactement le
-  # besoin des cinq unites de temps du PDF.
-  #
-  # db:
-  #   image: timescale/timescaledb:2.17.2-pg16
-  #   restart: unless-stopped
-  #   environment:
-  #     POSTGRES_DB: comite_or
-  #     POSTGRES_USER: comite
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant}
-  #   volumes:
-  #     - timeseries:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U comite -d comite_or"]
-  #     interval: 10s
-  #     retries: 5
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 4G
-
-# volumes:
-#   timeseries:
+volumes:
+  journal:

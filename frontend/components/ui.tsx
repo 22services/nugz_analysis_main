@@ -8,34 +8,8 @@
   Un utilisateur daltonien, ou qui lit l'ecran de loin, doit pouvoir decider.
 */
 
-import { useState, type ReactNode } from "react";
-import type { Direction, RiskVerdict, AgentStatus } from "@/lib/api";
-import type { Lang } from "@/lib/i18n";
-
-// ---------------------------------------------------------------------
-export function Section({
-  title, intro, right, children,
-}: {
-  title: string; intro?: string; right?: ReactNode; children: ReactNode;
-}) {
-  return (
-    <section className="mt-14">
-      <div className="flex items-end justify-between gap-6 mb-1">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-bone-500">
-          {title}
-        </h2>
-        {right}
-      </div>
-      <div className="rule mb-5" />
-      {intro && (
-        <p className="text-[15px] text-bone-500 max-w-3xl mb-6 leading-relaxed">
-          {intro}
-        </p>
-      )}
-      {children}
-    </section>
-  );
-}
+import { useState } from "react";
+import type { Direction } from "@/lib/api";
 
 // ---------------------------------------------------------------------
 /** Petite aide contextuelle. Indispensable pour un public non initie. */
@@ -154,58 +128,6 @@ export function ConvictionMeter({
 }
 
 // ---------------------------------------------------------------------
-export function StatusDot({ status }: { status: AgentStatus }) {
-  const map: Record<AgentStatus, { c: string; anim: string }> = {
-    IDLE: { c: "#3a342c", anim: "" },
-    RUNNING: { c: "#c8a055", anim: "pulse-soft" },
-    DONE: { c: "#4fb286", anim: "" },
-    BLOCKED: { c: "#d1614f", anim: "" },
-    SKIPPED: { c: "#6b6358", anim: "" },
-    FAILED: { c: "#d1614f", anim: "" },
-  };
-  const s = map[status];
-  return (
-    <span
-      className={`inline-block w-2 h-2 rounded-full shrink-0 ${s.anim}`}
-      style={{ background: s.c }}
-      aria-hidden
-    />
-  );
-}
-
-// ---------------------------------------------------------------------
-export function VerdictBadge({ v, lang }: { v: RiskVerdict; lang: Lang }) {
-  const label = {
-    APPROVED: { fr: "Approuvé", en: "Approved" },
-    REDUCE: { fr: "Taille réduite", en: "Size reduced" },
-    REJECT: { fr: "Rejeté", en: "Rejected" },
-  }[v][lang];
-  const tone = v === "APPROVED" ? "good" : v === "REDUCE" ? "warn" : "bad";
-  return <Pill label={label} tone={tone as "good" | "warn" | "bad"} />;
-}
-
-// ---------------------------------------------------------------------
-/** Etiquette + valeur, alignee en colonnes. Le motif de base du tableau. */
-export function Stat({
-  label, value, sub, tone, help,
-}: {
-  label: string; value: string; sub?: string; tone?: string; help?: string;
-}) {
-  return (
-    <div>
-      <div className="text-[12px] uppercase tracking-[0.14em] text-bone-700 mb-1.5">
-        {label}
-        {help && <Help text={help} />}
-      </div>
-      <div className={`num text-[22px] leading-none ${tone ?? "text-bone-100"}`}>
-        {value}
-      </div>
-      {sub && <div className="text-[13px] text-bone-500 mt-1.5">{sub}</div>}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------
 export function Toggle<T extends string>({
   options, value, onChange, ariaLabel,
 }: {
@@ -294,7 +216,7 @@ export function Tabs<T extends string>({
             type="button"
             aria-selected={active}
             onClick={() => onChange(tab.id)}
-            className={`relative shrink-0 px-4 py-3 text-[15px] font-medium
+            className={`relative shrink-0 px-3 sm:px-4 py-3 text-[15px] font-medium
                         border-b-[3px] transition-colors whitespace-nowrap ${
               active
                 ? "border-brass-500 text-bone-100"
@@ -316,29 +238,3 @@ export function Tabs<T extends string>({
   );
 }
 
-// ---------------------------------------------------------------------
-/** Grand chiffre, pour les indicateurs qui doivent se lire de loin. */
-export function BigStat({
-  label, value, unit, tone, help, sub,
-}: {
-  label: string; value: string; unit?: string;
-  tone?: string; help?: string; sub?: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11px] uppercase tracking-[0.16em] text-bone-700 mb-2">
-        {label}
-        {help && <Help text={help} />}
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className={`num text-[34px] leading-none ${tone ?? "text-bone-100"}`}>
-          {value}
-        </span>
-        {unit && <span className="num text-[15px] text-bone-700">{unit}</span>}
-      </div>
-      {sub && (
-        <div className="text-[13px] text-bone-500 mt-2 leading-snug">{sub}</div>
-      )}
-    </div>
-  );
-}

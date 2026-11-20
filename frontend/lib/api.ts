@@ -1,278 +1,187 @@
-/* Client typé de l'API du comité. */
+/* Client typé de l'API nugz (comité 15 min, graphique, terminal). */
 
 import type { Localized } from "./i18n";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
 
-// -- Types partagés avec le backend -----------------------------------
 export type Direction = "LONG" | "SHORT" | "NEUTRAL" | "NO_TRADE";
 export type RiskVerdict = "APPROVED" | "REDUCE" | "REJECT";
-export type AgentStatus =
-  | "IDLE" | "RUNNING" | "DONE" | "BLOCKED" | "SKIPPED" | "FAILED";
-export type RunStage =
-  | "DATA" | "ANALYSIS" | "RED_TEAM" | "REBUTTAL" | "RISK"
-  | "DECISION" | "COMPLETE" | "HALTED";
 
-export interface ToolSpec {
-  name: string;
-  provider: string;
-  purpose: Localized;
-  connected: boolean;
-}
+export interface Candle { t: string; o: number; h: number; l: number; c: number; v: number }
 
-export interface AgentCard {
-  id: string;
-  order: number;
-  name: Localized;
-  role: Localized;
-  mandate: Localized;
-  plain: Localized;
-  can_veto: boolean;
-  tools: ToolSpec[];
-  model_hint: string;
-  stage: RunStage;
-}
-
+// ---------------------------------------------------------------------
+// Décision
+// ---------------------------------------------------------------------
 export interface Evidence {
   label: Localized;
-  value: string;
-  reading: Localized;
-  weight: number;
-  supports: Direction;
+  value: string | Localized;
+  reading: Localized | null;
+  supports: number;
 }
 
-export interface AgentOutput {
-  agent_id: string;
-  status: AgentStatus;
-  duration_ms: number | null;
-  headline: Localized | null;
-  detail: Localized | null;
-  evidence: Evidence[];
-  conviction: number | null;
-  direction: Direction | null;
-  horizon: Localized | null;
-  warnings: Localized[];
-  payload: Record<string, unknown>;
-}
-
-export interface TicketSection {
-  title: Localized;
-  rows: [string, string][];
-}
-
-export interface TradeTicket {
-  instrument: string;
-  contract: string;
-  timestamp: string;
-  horizon: string;
-  trend: Localized;
-  volatility: Localized;
-  macro_regime: Localized;
-  event_risk: Localized;
-  direction: Direction;
-  conviction: number;
-  expected_horizon: Localized;
-  thesis: Localized;
-  technical: TicketSection;
-  macro: TicketSection;
-  futures: TicketSection;
-  catalysts: TicketSection;
-  bull_case: Localized[];
-  bear_case: Localized[];
-  invalidation: Localized[];
-  entry_zone: Localized;
-  stop_logic: Localized;
-  target_logic: Localized;
-  time_stop: Localized;
-  risk_budget: Localized;
-  liquidity: Localized;
-  event_exposure: Localized;
-  risk_verdict: RiskVerdict;
-  final_decision: Direction;
-  decision_rationale: Localized;
-  monitoring: Localized[];
-}
-
-export interface Run {
-  run_id: string;
-  started_at: string;
-  finished_at: string | null;
-  trigger: string;
-  stage: RunStage;
-  decision: Direction | null;
-  conviction: number | null;
-  risk_verdict: RiskVerdict | null;
-  event_risk: string | null;
-  spot_at_decision: number | null;
-  halted: boolean;
-  outputs: Record<string, AgentOutput>;
-  ticket: TradeTicket | null;
-  input_snapshot: Record<string, unknown>;
-}
-
-export interface DataSource {
-  name: string;
-  kind: string;
-  age_seconds: number;
-  max_age_seconds: number;
-  is_stale: boolean;
-  connected: boolean;
-}
-
-export interface TimeframeRead {
-  timeframe: string;
-  structure: string;
-  quality: string;
-  momentum: number;
-  atr: number;
-  atr_percentile: number;
-  above_vwap: boolean;
-  vwap: number;
-  close: number;
-}
-
-export interface Level {
-  price: number;
-  touches: number;
-  kind: string;
-  distance_pct: number;
-}
-
-export interface CalendarEvent {
+export interface Agent {
+  id: "structure" | "vwap" | "profile" | "volatility" | "cross";
   name: Localized;
-  scheduled_at: string;
-  minutes_until: number;
-  importance: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  exposed_variables: Localized[];
-  consensus: string | null;
-  previous: string | null;
+  role: Localized;
+  group: "trend" | "location" | "context" | "filter";
+  status: "OK" | "UNAVAILABLE";
+  score: number;
+  direction: Direction;
+  headline: Localized;
+  evidence: Evidence[];
+  warnings: Localized[];
+  multiplier?: number;
 }
 
-export interface Trigger {
-  kind: string;
-  priority: number;
-  timeframe: string;
-  reason: Localized;
-  dedup_key: string;
+export interface Objection { severity: number; claim: Localized; targets: string[] }
+
+export interface RiskCheck {
+  name: Localized; passed: boolean; hard: boolean; detail: Localized | null;
 }
 
-export interface Candle {
-  t: string; o: number; h: number; l: number; c: number; v: number;
+export interface Risk {
+  verdict: RiskVerdict;
+  checks: RiskCheck[];
+  entry: number; stop: number; stop_atr: number; stop_source: Localized;
+  t1: number; t1_name: Localized; t2: number; t2_name: Localized;
+  rr1: number; rr2: number; chase_limit: number;
+  risk_usd: number; size_factor: number;
+  contracts: { GC: number; MGC: number };
+  risk_per_contract: { GC: number; MGC: number };
 }
 
-export interface MarketState {
-  features: {
-    schema_version: string;
-    as_of: string;
-    spot: number;
-    contract: { symbol: string; days_to_roll: number; series_type: string;
-                roll_warning: Localized | null };
-    session: { session: string; is_liquid_hours: boolean };
-    vwap_distance_atr: { value: number; unit: string; meaning: string };
-    atr_percentile: { value: number };
-    alignment: { value: number };
-    structure_by_tf: Record<string, string>;
-    momentum_by_tf: Record<string, number>;
-    extras: Record<string, { value: number; unit: string }>;
-    state_summary: Localized;
+export interface Decision {
+  engine_version: string;
+  symbol: string;
+  name: string;
+  bar_start: string;
+  bar_end: string;
+  decided_at: string;
+  decision: Direction;
+  reason: string | null;
+  conviction: number;
+  rationale: Localized;
+  market: {
+    price: number; session: string; session_label: Localized;
+    atr: number; atr_pct: number; regime: string;
+    daily_atr: number | null; range_consumed: number | null;
+    vwap: number | null; vwap_sd: number | null;
+    poc: number | null; vah: number | null; val: number | null; dpoc: number | null;
+    pdh: number | null; pdl: number | null;
   };
-  reads: TimeframeRead[];
-  levels: Level[];
-  sources: DataSource[];
-  calendar: CalendarEvent[];
-  triggers: Trigger[];
-  change_pct: number;
-  candles: Candle[];
-}
-
-export interface AgentsResponse {
-  agents: AgentCard[];
-  total: number;
-  llm_agents: number;
-  deterministic_agents: number;
-  tools_total: number;
-  tools_connected: number;
+  agents: Agent[];
+  cio: {
+    raw_score: number; threshold: number; min_conviction: number;
+    groups: { trend: number | null; location: number | null; context: number | null };
+    weights: { trend: number; location: number; context: number };
+    naive_vote: { long: number; short: number; neutral: number };
+    probe_direction: number;
+  };
+  red_team: { objections: Objection[]; penalty: number };
+  risk: Risk;
+  schedule?: { next_run_at: string | null; last_error: string | null; data_delay_s: number };
 }
 
 export interface JournalEntry {
-  run_id: string;
-  timestamp: string;
+  source: "live" | "replay";
+  bar_start: string;
+  bar_end: string;
   decision: Direction;
+  reason: string | null;
   conviction: number;
-  risk_verdict: RiskVerdict;
-  spot: number;
-  outcome: string;
-  notes: Localized | null;
+  price: number;
+  entry_ref: number; stop: number; t1: number; rr1: number;
+  outcome: "NO_TRADE" | "OPEN" | "WIN" | "LOSS" | "SCRATCH" | "MISSED";
+  entry: number | null; exit: number | null; pnl_r: number | null;
+  taken: boolean;
 }
 
-export interface CalibrationBucket {
-  lower: number;
-  upper: number;
-  n_trades: number;
-  n_wins: number;
-  observed_rate: number | null;
-}
-
-export interface AgentReliability {
-  agent_id: string;
-  n_trades: number;
-  hit_rate: number | null;
-  buckets: (CalibrationBucket & { reliable: boolean })[];
-  reliable_buckets: number;
+export interface JournalStats {
+  source: string;
+  decisions: number; signals: number; trades: number; in_position_skipped: number;
+  no_trade_rate: number | null;
+  closed: number; open: number; missed: number; wins: number; losses: number;
+  hit_rate: number | null; hit_ci: [number, number] | null;
+  expectancy_r: number | null; expectancy_ci: [number, number] | null;
+  total_r: number | null;
+  profit_factor: number | null; worst_losing_streak: number;
   sample_sufficient: boolean;
+  from: string | null; to: string | null;
 }
 
-export interface JournalResponse {
-  entries: JournalEntry[];
-  stats: {
-    total_runs: number;
-    decisions: number;
-    no_trades: number;
-    no_trade_rate: number;
-    closed: number;
-    hit_rate: number | null;
-    avg_conviction: number | null;
-    sample_sufficient: boolean;
-  };
-  calibration: CalibrationBucket[];
-  by_agent: AgentReliability[];
+export interface History {
+  items: JournalEntry[];
+  stats: { live: JournalStats; replay: JournalStats };
+  replay: { status: string; done: number; total: number };
 }
 
-export interface Scenario {
-  id: string;
-  seed: number;
-  fr: string;
-  en: string;
+// ---------------------------------------------------------------------
+// Graphique
+// ---------------------------------------------------------------------
+export type ChartInterval = "5m" | "15m" | "1h" | "1d" | "1W";
+
+export interface PatternEvent {
+  i: number; kind: string; dir: number;
+  level?: number; from_i?: number; top?: number; bottom?: number;
+  p1?: number; p2?: number; neckline?: number;
 }
 
-// -- Appels -----------------------------------------------------------
+export interface Swing { i: number; kind: "H" | "L"; price: number; label: string | null }
+
+export interface Fvg { i: number; dir: number; top: number; bottom: number; filled_at: number | null }
+
+export interface PatternStat {
+  kind: string; n: number; hit_rate?: number; ci?: [number, number];
+  baseline: number; lift?: number; hit_is?: number | null; hit_oos?: number | null;
+  avg_gain_atr?: number | null; label: "INSUFFICIENT" | "NOT_PROVEN" | "PLAUSIBLE";
+}
+
+export interface PatternMeta {
+  dir: number; group: string; fr: string; en: string; plain_fr: string; plain_en: string;
+}
+
+export interface Profile { poc: number; vah: number; val: number; bin_size: number; bins: [number, number][] }
+
+export interface ChartData {
+  symbol: string;
+  interval: ChartInterval;
+  horizon: number;
+  decimals: number;
+  candles: Candle[];
+  atr: number;
+  structure: { trend: string };
+  has_volume: boolean;
+  vwap: { vwap: (number | null)[]; u1: (number | null)[]; l1: (number | null)[];
+          u2: (number | null)[]; l2: (number | null)[] } | null;
+  session_breaks?: number[];
+  prior_session?: { poc: number; vah: number; val: number; high: number; low: number };
+  profile: Profile | null;
+  swings: Swing[];
+  events: PatternEvent[];
+  fvgs: Fvg[];
+  stats: PatternStat[];
+  meta: Record<string, PatternMeta>;
+  sample: { bars: number; from: string; to: string };
+}
+
+// ---------------------------------------------------------------------
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
 
-/**
- * `/api/runs` ne renvoie que des resumes : ni `outputs`, ni `ticket`.
- * Pour afficher le comite il faut le run complet, d'ou `runDetail`.
- */
-export type RunSummary = Omit<Run, "outputs" | "ticket" | "input_snapshot">;
-
 export const api = {
-  agents: () => get<AgentsResponse>("/api/agents"),
-  market: (scenario = "long") =>
-    get<MarketState>(`/api/market?scenario=${scenario}`),
-  journal: () => get<JournalResponse>("/api/journal"),
-  scenarios: () => get<{ scenarios: Scenario[] }>("/api/scenarios"),
-  runs: () => get<{ runs: RunSummary[] }>("/api/runs"),
-  runDetail: (id: string) => get<Run>(`/api/runs/${id}`),
-
-  run: async (scenario: string): Promise<Run> => {
-    const res = await fetch(`${API_BASE}/api/run?scenario=${scenario}`, {
-      method: "POST",
-    });
-    if (!res.ok) throw new Error(`run → ${res.status}`);
+  decision: () => get<Decision>("/api/decision"),
+  history: (source: "live" | "replay", limit = 96) =>
+    get<History>(`/api/decision/history?source=${source}&limit=${limit}`),
+  chart: (symbol: string, interval: ChartInterval, bars = 160) =>
+    get<ChartData>(
+      `/api/chart?symbol=${encodeURIComponent(symbol)}&interval=${interval}&bars=${bars}`),
+  refresh: async (): Promise<Decision> => {
+    const res = await fetch(`${API_BASE}/api/decision/refresh`, { method: "POST" });
+    if (!res.ok) throw new Error(`refresh → ${res.status}`);
     return res.json();
   },
 };

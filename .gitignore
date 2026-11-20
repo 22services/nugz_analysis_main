@@ -17,3 +17,7 @@ frontend/.env.local
 # Documents prives, hors depot public
 *.pdf
 exemple_dashboard_design.png
+
+# Journal local des decisions (en prod : volume Docker)
+backend/data/
+.pytest_cache/
