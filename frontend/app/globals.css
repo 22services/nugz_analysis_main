@@ -56,9 +56,9 @@
   --color-warn-900: #362a15;
 
   /* -- Typographie -------------------------------------------------- */
-  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
-  --font-serif: var(--font-plex-serif), ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --font-serif: "IBM Plex Serif", ui-serif, Georgia, serif;
 
   /* -- Rayons : franc, pas de bulle --------------------------------- */
   --radius-card: 6px;

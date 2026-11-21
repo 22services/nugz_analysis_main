@@ -34,7 +34,7 @@ const DOWN = "#d1614f";
 const BRASS = "#c8a055";
 const GRID = "#221e19";
 const AXIS = "#6b6358";
-const MONO = "var(--font-plex-mono), monospace";
+const MONO = "\"IBM Plex Mono\", monospace";
 
 const PAD_R = 64;
 const PAD_T = 14;
