@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app import data
 from app.data import PROVIDER, cached, obb, rows
+from app.translate import translate_many
 
 router = APIRouter(prefix="/api/terminal")
 
@@ -106,7 +107,8 @@ def history(symbol: str = Query("GC=F", max_length=20),
 
 @router.get("/news")
 def news(symbols: str = Query("GC=F,GLD", max_length=80),
-         limit: int = Query(20, ge=1, le=50)) -> dict:
+         limit: int = Query(20, ge=1, le=50),
+         lang: str = Query("en", pattern="^(en|fr)$")) -> dict:
     def build() -> dict:
         res = rows(obb.news.company(symbols, provider=PROVIDER, limit=limit))
         seen, items = set(), []
@@ -117,9 +119,15 @@ def news(symbols: str = Query("GC=F,GLD", max_length=80),
             items.append({"date": r.get("date"), "title": r.get("title"),
                           "url": r.get("url"), "source": r.get("source"),
                           "summary": (r.get("summary") or "")[:280]})
-        return {"items": items[:limit]}
+        items = items[:limit]
+        if lang == "fr" and items:
+            tr = translate_many([i["title"] or "" for i in items], "fr")
+            for it, text, ok in zip(items, tr["texts"], tr["translated"]):
+                it["title_original"] = it["title"]
+                it["title"], it["translated"] = text, ok
+        return {"items": items, "lang": lang}
 
-    return _guard(lambda: cached(f"news:{symbols}:{limit}", 300, build))
+    return _guard(lambda: cached(f"news:{symbols}:{limit}:{lang}", 300, build))
 
 
 @router.get("/curve")

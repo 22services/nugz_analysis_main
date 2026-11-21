@@ -37,6 +37,8 @@ export interface NewsItem {
   url: string;
   source: string | null;
   summary: string;
+  title_original?: string;
+  translated?: boolean;
 }
 
 export interface CurvePoint {
@@ -56,9 +58,9 @@ export const terminal = {
   history: (symbol: string, interval: Interval) =>
     get<History>(
       `/history?symbol=${encodeURIComponent(symbol)}&interval=${interval}`),
-  news: (symbols: string) =>
+  news: (symbols: string, lang: "fr" | "en" = "en") =>
     get<{ items: NewsItem[] }>(
-      `/news?symbols=${encodeURIComponent(symbols)}&limit=25`),
+      `/news?symbols=${encodeURIComponent(symbols)}&limit=25&lang=${lang}`),
   curve: () =>
     get<{ as_of: string; compare_to: string; points: CurvePoint[] }>("/curve"),
 };

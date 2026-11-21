@@ -202,6 +202,7 @@ const dict = {
   termCurve: { fr: "Courbe des Treasuries US", en: "US Treasury curve" },
   termCurvePrev: { fr: "il y a 1 mois", en: "1 month ago" },
   termNews: { fr: "Fil d'actualité", en: "News wire" },
+  termTranslated: { fr: "traduit automatiquement · survol = original", en: "auto-translated" },
   termRange52: { fr: "Fourchette 52 sem.", en: "52-week range" },
   termLive: { fr: "Données réelles", en: "Live data" },
   termSourceNote: {

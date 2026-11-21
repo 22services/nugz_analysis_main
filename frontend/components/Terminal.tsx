@@ -87,9 +87,9 @@ export default function Terminal({ lang }: { lang: Lang }) {
   useEffect(() => {
     let alive = true;
     const syms = symbol === "GC=F" ? "GC=F,GLD" : symbol;
-    terminal.news(syms).then((d) => alive && setNews(d.items)).catch(() => alive && setNews([]));
+    terminal.news(syms, lang).then((d) => alive && setNews(d.items)).catch(() => alive && setNews([]));
     return () => { alive = false; };
-  }, [symbol]);
+  }, [symbol, lang]);
 
   // Raccourci clavier facon terminal : "/" donne le focus a la commande.
   useEffect(() => {
@@ -308,7 +308,9 @@ export default function Terminal({ lang }: { lang: Lang }) {
           </TPanel>
 
           {/* ---- CN : actualités ---- */}
-          <TPanel code="CN" title={tr("termNews", lang)}>
+          <TPanel code="CN" title={tr("termNews", lang)}
+            right={news?.some((n) => n.translated) && (
+              <span className="text-[11px] text-bone-700">{tr("termTranslated", lang)}</span>)}>
             {!news ? (
               <div className="text-bone-700 text-[14px] pulse-soft py-4">{tr("loading", lang)}</div>
             ) : news.length === 0 ? (
@@ -322,6 +324,7 @@ export default function Terminal({ lang }: { lang: Lang }) {
                       <span className="truncate">{n.source}</span>
                     </div>
                     <a href={n.url} target="_blank" rel="noopener noreferrer"
+                       title={n.translated ? n.title_original : undefined}
                        className="text-[14px] leading-snug text-bone-100 hover:text-brass-400">
                       {n.title}
                     </a>
