@@ -21,6 +21,19 @@ import {
 } from "@/lib/terminal";
 
 const INTERVALS: Interval[] = ["5m", "15m", "1h", "1d", "1W"];
+
+/** Noms d'instruments en français (le service renvoie l'anglais). */
+const NAME_FR: Record<string, string> = {
+  "GC=F": "Or", "SI=F": "Argent", "PL=F": "Platine", "HG=F": "Cuivre",
+  "DX-Y.NYB": "Indice dollar", "EURUSD=X": "EUR/USD", "USDJPY=X": "USD/JPY",
+  "^TNX": "Taux US 10 ans", "^FVX": "Taux US 5 ans", "^GSPC": "S&P 500",
+  "^NDX": "Nasdaq 100", "^VIX": "VIX (peur)", "CL=F": "Pétrole WTI", "BTC-USD": "Bitcoin",
+};
+const nm = (sym: string, name: string | undefined, lang: Lang) =>
+  (lang === "fr" && NAME_FR[sym]) || name || sym;
+
+/** Locale des nombres : fixée au début du rendu (format 3 536,50 en français). */
+let NUM_LOCALE = "en-US";
 const GROUP_LABEL: Record<WatchItem["group"], [string, string]> = {
   metals: ["Métaux", "Metals"],
   fx: ["Changes", "FX"],
@@ -31,6 +44,7 @@ const GROUP_LABEL: Record<WatchItem["group"], [string, string]> = {
 };
 
 export default function Terminal({ lang }: { lang: Lang }) {
+  NUM_LOCALE = lang === "fr" ? "fr-FR" : "en-US";
   const [symbol, setSymbol] = useState("GC=F");
   const [interval, setInterval_] = useState<Interval>("1d");
   const [watch, setWatch] = useState<WatchItem[] | null>(null);
@@ -40,6 +54,7 @@ export default function Terminal({ lang }: { lang: Lang }) {
   const [news, setNews] = useState<NewsItem[] | null>(null);
   const [curve, setCurve] = useState<{ as_of: string; points: CurvePoint[] } | null>(null);
   const [failed, setFailed] = useState(false);
+  const [curveErr, setCurveErr] = useState(false);
   const [cmd, setCmd] = useState("");
   const cmdRef = useRef<HTMLInputElement>(null);
 
@@ -55,7 +70,7 @@ export default function Terminal({ lang }: { lang: Lang }) {
   }, []);
 
   useEffect(() => {
-    terminal.curve().then(setCurve).catch(() => {});
+    terminal.curve().then(setCurve).catch(() => setCurveErr(true));
   }, []);
 
   useEffect(() => {
@@ -141,7 +156,7 @@ export default function Terminal({ lang }: { lang: Lang }) {
       <div className="grid lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-3">
         <div className="space-y-3 min-w-0">
           {/* ---- GP : graphique ---- */}
-          <TPanel code="GP" title={hist?.name ?? symbol}
+          <TPanel code="GP" title={nm(symbol, hist?.name, lang)}
             right={
               <div role="group" aria-label="Interval" className="flex gap-1">
                 {INTERVALS.map((iv) => (
@@ -190,12 +205,12 @@ export default function Terminal({ lang }: { lang: Lang }) {
                 <table className="w-full text-[14px] num">
                   <thead>
                     <tr className="text-[11px] uppercase tracking-[0.12em] text-bone-700 text-right">
-                      <th className="text-left font-normal py-1.5 px-1">Ticker</th>
+                      <th className="text-left font-normal py-1.5 px-1">{lang === "fr" ? "Symbole" : "Ticker"}</th>
                       <th className="text-left font-normal px-1 hidden sm:table-cell">
                         {lang === "fr" ? "Nom" : "Name"}
                       </th>
                       <th className="font-normal px-1">{lang === "fr" ? "Dernier" : "Last"}</th>
-                      <th className="font-normal px-1">Var.</th>
+                      <th className="font-normal px-1">{lang === "fr" ? "Var." : "Chg"}</th>
                       <th className="font-normal px-1">%</th>
                       <th className="font-normal px-1 hidden md:table-cell">1M</th>
                     </tr>
@@ -224,7 +239,7 @@ export default function Terminal({ lang }: { lang: Lang }) {
                             )}
                           </td>
                           <td className="text-left px-1 text-bone-500 font-sans hidden sm:table-cell truncate max-w-[150px]">
-                            {w.name}
+                            {nm(w.symbol, w.name, lang)}
                           </td>
                           <td className="px-1 text-bone-100">{fmt(w.last)}</td>
                           <td className="px-1"><Chg value={w.change} digits={dp(w.last)} /></td>
@@ -252,10 +267,14 @@ export default function Terminal({ lang }: { lang: Lang }) {
               <>
                 <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5 text-[13px]">
                   {([
-                    ["Open", sel.open], ["High", sel.high], ["Low", sel.low],
-                    ["Bid", sel.bid], ["Ask", sel.ask],
+                    [lang === "fr" ? "Ouverture" : "Open", sel.open],
+                    [lang === "fr" ? "Plus haut" : "High", sel.high],
+                    [lang === "fr" ? "Plus bas" : "Low", sel.low],
+                    [lang === "fr" ? "Achat (bid)" : "Bid", sel.bid],
+                    [lang === "fr" ? "Vente (ask)" : "Ask", sel.ask],
                     ["Vol.", sel.volume],
-                    ["MA 50", sel.ma_50d], ["MA 200", sel.ma_200d],
+                    [lang === "fr" ? "Moy. mobile 50 j" : "MA 50", sel.ma_50d],
+                    [lang === "fr" ? "Moy. mobile 200 j" : "MA 200", sel.ma_200d],
                   ] as [string, number | null][]).map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-2 border-b border-ink-700 py-0.5">
                       <dt className="text-bone-700">{k}</dt>
@@ -282,8 +301,9 @@ export default function Terminal({ lang }: { lang: Lang }) {
           <TPanel code="GC" title={tr("termCurve", lang)}
             right={curve && <span className="num text-[11px] text-bone-700">{curve.as_of}</span>}>
             {curve ? <Curve points={curve.points} lang={lang} />
-              : <div className="h-[150px] grid place-items-center text-bone-700 text-[14px] pulse-soft">
-                  {tr("loading", lang)}
+              : <div className={`h-[150px] grid place-items-center text-[14px] ${
+                  curveErr ? "text-short-400" : "text-bone-700 pulse-soft"}`}>
+                  {curveErr ? tr("termError", lang) : tr("loading", lang)}
                 </div>}
           </TPanel>
 
@@ -437,7 +457,7 @@ function dp(v: number | null): number {
 function fmt(v: number | null): string {
   if (v == null) return "—";
   const d = dp(v);
-  return v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  return v.toLocaleString(NUM_LOCALE, { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
 function fmtVol(v: number | null, loc: string): string {

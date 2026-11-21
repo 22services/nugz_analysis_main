@@ -181,6 +181,15 @@ const dict = {
   candlesWord: { fr: "bougies", en: "candles" },
   sample: { fr: "Échantillon", en: "Sample" },
   localTime: { fr: "heure locale", en: "local time" },
+  preset_essential: { fr: "Essentiel", en: "Essentials" },
+  preset_structure: { fr: "Structure", en: "Structure" },
+  preset_all: { fr: "Tout", en: "Everything" },
+  customize: { fr: "Personnaliser l'affichage", en: "Customize display" },
+  readTitle: { fr: "Lecture en clair", en: "Plain-language reading" },
+  readNote: {
+    fr: "Ceci décrit ce que montre le graphique à cet instant. Ce n'est pas une prévision.",
+    en: "This describes what the chart shows right now. It is not a forecast.",
+  },
 
   // -- Terminal --------------------------------------------------------
   termCommand: { fr: "Symbole", en: "Symbol" },
